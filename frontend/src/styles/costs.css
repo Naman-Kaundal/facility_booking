@@ -1,0 +1,100 @@
+/* Week 4: cost breakdown, payment instructions, Estate/Facilities actions */
+
+.costs table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.costs th,
+.costs td {
+  text-align: left;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  font-weight: 400;
+}
+.costs td.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.costs__items {
+  margin-bottom: 10px;
+}
+.costs__items th {
+  font-size: 0.85rem;
+}
+.costs__remark {
+  display: block;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+.costs__total th,
+.costs__total td {
+  font-weight: 700;
+  border-bottom: 2px solid var(--ink);
+}
+.costs__advance {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--navy-100);
+  border: 1px solid #c9d5ea;
+}
+.costs__advance > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.costs__advance .muted {
+  font-size: 0.8rem;
+}
+.costs__advance-amount {
+  font-size: 1.35rem;
+  color: var(--navy-900);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.payment {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 2px solid var(--success);
+  background: #eef8f1;
+}
+.payment h2 {
+  margin-top: 0;
+}
+
+.estimate-form {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+@media (max-width: 640px) {
+  .estimate-form {
+    grid-template-columns: 1fr;
+  }
+  .costs__advance {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.status--costed {
+  color: var(--navy-800);
+  border-color: #c9d5ea;
+  background: var(--navy-100);
+}
+.status--advance_intimated {
+  color: var(--success);
+  border-color: #b7dfc7;
+  background: #eef8f1;
+}

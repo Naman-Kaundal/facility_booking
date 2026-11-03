@@ -7,6 +7,23 @@ export function formatInr(amount: number): string {
   return amount === 0 ? "No charges" : inr.format(amount);
 }
 
+const inrPaise = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** Calculated amounts (GST, advance…) with paise: ₹30,040.00 */
+export function formatMoney(amount: number): string {
+  return inrPaise.format(amount);
+}
+
+/** "18" or "12.5" for percentages. */
+export function formatPct(value: number): string {
+  return `${Number(value.toFixed(2))}%`;
+}
+
 /** Money total, where 0 should read as ₹0 rather than "No charges". */
 export function formatTotal(amount: number): string {
   return inr.format(amount);
@@ -86,4 +103,6 @@ export const STATUS_HELP: Partial<Record<RequestStatus, string>> = {
   WITH_SECTION: "The Academic and/or Sports section is deciding on each facility.",
   REJECTED: "None of the facilities could be approved.",
   WITH_ESTATE: "All sections have decided. Next, Estate adds the electricity estimate and Facilities works out the costs.",
+  COSTED: "The costs have been calculated. Facilities will send you the advance to pay.",
+  ADVANCE_INTIMATED: "Pay the advance below through the institute payment page to complete the booking.",
 };

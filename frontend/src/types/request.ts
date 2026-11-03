@@ -1,3 +1,4 @@
+import type { CostBreakdown } from "./costs";
 import type { RateCategory, Section, SlotUnit } from "./facility";
 
 export type RequestStatus =
@@ -74,6 +75,8 @@ export interface BookingRequest {
   terms_version: string | null;
   return_reason: string | null;
   returned_at: string | null;
+  /** Week 4: staff see it once costed; the requester after the advance intimation. */
+  costs?: CostBreakdown | null;
 }
 
 export interface RequestSummary {

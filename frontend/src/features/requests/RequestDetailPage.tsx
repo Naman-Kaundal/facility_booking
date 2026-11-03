@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { errorMessage } from "../../api/client";
 import { deleteDraft, getEvents } from "../../api/requests";
+import { CostBreakdown, PaymentInstructions } from "../../components/CostBreakdown";
 import { DecisionBadge } from "../../components/DecisionBadge";
 import { StatusBadge } from "../../components/StatusBadge";
 import { ErrorState, LoadingState } from "../../components/States";
@@ -156,6 +157,13 @@ export function RequestDetailPage() {
           <p className="hint">{preview.note}</p>
         </div>
       </div>
+
+      {request.costs && (
+        <div className="panel">
+          <PaymentInstructions costs={request.costs} refNo={request.ref_no} />
+          <CostBreakdown costs={request.costs} title="Final cost breakdown" />
+        </div>
+      )}
 
       {request.submitted_at && (
         <div className="panel">
