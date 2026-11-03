@@ -1,0 +1,63 @@
+/* Week 3: staff desks (Facilities, Academic, Sports) */
+
+.desk-sub {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.desk-empty {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.staff-lines li {
+  display: block;
+}
+.staff-line {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.staff-line__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.staff-line__head > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.decision-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-top: 4px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--page);
+}
+.decision-form label {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.decision-form input {
+  width: 100%;
+}
+.decision-form__buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.staff-actions textarea {
+  width: 100%;
+}
+.form-actions--start {
+  justify-content: flex-start;
+}
+
+.home-card--staff {
+  border-left: 4px solid var(--navy-700);
+}

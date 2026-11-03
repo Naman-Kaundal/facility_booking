@@ -1,0 +1,135 @@
+/* Week 3: review & submit, decisions, timeline (requester side) */
+
+.terms-box {
+  max-height: 260px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--page);
+  margin: 8px 0 12px;
+}
+.terms-box:focus-visible {
+  outline: 3px solid var(--accent);
+}
+.accept {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.accept input {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+}
+
+.decision {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--page);
+  white-space: nowrap;
+}
+.decision--confirmed {
+  color: var(--success);
+  border-color: #b7dfc7;
+  background: #eef8f1;
+}
+.decision--rejected {
+  color: var(--danger);
+  border-color: #f2c4bf;
+  background: #fff6f5;
+}
+.decision--pending {
+  border-style: dashed;
+}
+.decision-remark {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+.status--returned {
+  color: #7a5408;
+  border-color: #f0d9a6;
+  background: #fff7e6;
+}
+.status--with_estate,
+.status--with_section,
+.status--submitted {
+  color: var(--navy-800);
+  border-color: #c9d5ea;
+  background: var(--navy-100);
+}
+
+.status-help {
+  margin: 4px 0 0;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 18px;
+  border-left: 2px solid var(--line);
+}
+.timeline__item {
+  position: relative;
+  padding: 0 0 14px 12px;
+}
+.timeline__item::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--navy-700);
+}
+.timeline__item--line_rejected::before,
+.timeline__item--returned::before {
+  border-color: var(--danger);
+}
+.timeline__item--line_confirmed::before {
+  border-color: var(--success);
+}
+.timeline__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.timeline__head time {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.timeline__meta,
+.timeline__line {
+  font-size: 0.85rem;
+}
+.timeline__remark {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+.slot-taken {
+  color: var(--ink-muted);
+}
+.alert--warning {
+  background: #fff7e6;
+  border: 1px solid #f0d9a6;
+  color: #7a5408;
+}

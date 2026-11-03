@@ -1,5 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select, update
+
+from app.db.models import Facility, Tariff
 from app.db.seed_data import FACILITIES
 
 
@@ -19,6 +22,7 @@ async def test_catalogue_item_shape(client):
     assert m5["section"] == "ACADEMIC"
     assert m5["capacity"] == 150
     assert m5["slot_types"] == ["FULL_DAY"]
+    assert m5["id"].isdigit()
     assert {(t["category"], t["amount"]) for t in m5["tariffs"]} == {
         ("PRIVATE", 15000),
         ("GOVT", 10000),
@@ -33,11 +37,9 @@ async def test_sports_facilities_route_to_sports_with_free_iit_rate(client):
         iit = next(t for t in items[code]["tariffs"] if t["category"] == "IIT")
         assert iit["amount"] == 0
         assert iit["display_label"] == "No charges"
-    assert [s["slot_key"] for s in items["FOOTBALL"]["slot_options"]] == [
-        "09:00-12:00",
-        "12:00-15:00",
-        "15:00-18:00",
-    ]
+    football_slots = items["FOOTBALL"]["slot_options"]
+    assert [s["slot_key"] for s in football_slots] == ["09:00-12:00", "12:00-15:00", "15:00-18:00"]
+    assert (football_slots[0]["start"], football_slots[0]["end"]) == ("09:00", "12:00")
 
 
 async def test_only_auditorium_complete_offers_half_day(client):
@@ -45,13 +47,15 @@ async def test_only_auditorium_complete_offers_half_day(client):
     half_day = [f["code"] for f in items if "HALF_DAY" in f["slot_types"]]
     assert half_day == ["AUDI_COMPLETE"]
     audi = next(f for f in items if f["code"] == "AUDI_COMPLETE")
+    assert audi["slot_types"] == ["FULL_DAY", "HALF_DAY"]
     half_tariffs = {t["category"]: t["amount"] for t in audi["tariffs"] if t["unit"] == "HALF_DAY"}
     assert half_tariffs == {"PRIVATE": 30000, "GOVT": 20000, "IIT": 15000}
-    assert {s["slot_key"] for s in audi["slot_options"]} == {"FULL_DAY", "FIRST_HALF", "SECOND_HALF"}
+    assert [s["slot_key"] for s in audi["slot_options"]] == ["FULL_DAY", "FIRST_HALF", "SECOND_HALF"]
 
 
 async def test_inactive_facilities_are_hidden_by_default(client, seeded_db):
-    await seeded_db.facilities.update_one({"code": "HOCKEY"}, {"$set": {"active": False}})
+    seeded_db.execute(update(Facility).where(Facility.code == "HOCKEY").values(active=False))
+    seeded_db.commit()
     active_codes = [f["code"] for f in (await client.get("/api/v1/facilities")).json()["items"]]
     assert "HOCKEY" not in active_codes
     inactive = (await client.get("/api/v1/facilities", params={"active": "false"})).json()["items"]
@@ -59,38 +63,36 @@ async def test_inactive_facilities_are_hidden_by_default(client, seeded_db):
 
 
 async def test_newer_effective_tariff_replaces_older_one(client, seeded_db):
-    m3 = await seeded_db.facilities.find_one({"code": "M3"})
-    await seeded_db.tariffs.insert_one(
-        {
-            "facility_id": m3["_id"],
-            "category": "PRIVATE",
-            "unit": "FULL_DAY",
-            "version": "test-v2",
-            "amount": 12000,
-            "display_label": "₹12,000 / full day",
-            "effective_from": datetime.now(UTC) - timedelta(days=1),
-            "effective_to": None,
-            "active": True,
-        }
+    m3_id = seeded_db.scalar(select(Facility.id).where(Facility.code == "M3"))
+    now = datetime.now(UTC)
+    common = {"facility_id": m3_id, "category": "PRIVATE", "unit": "FULL_DAY", "effective_to": None}
+    seeded_db.add_all(
+        [
+            Tariff(**common, version="test-v2", amount=12000, display_label="₹12,000 / full day",
+                   effective_from=now - timedelta(days=1)),
+            # A future-dated tariff must not apply yet.
+            Tariff(**common, version="test-future", amount=99999, display_label="future",
+                   effective_from=now + timedelta(days=30)),
+        ]
     )
-    # A future-dated tariff must not apply yet.
-    await seeded_db.tariffs.insert_one(
-        {
-            "facility_id": m3["_id"],
-            "category": "PRIVATE",
-            "unit": "FULL_DAY",
-            "version": "test-future",
-            "amount": 99999,
-            "display_label": "future",
-            "effective_from": datetime.now(UTC) + timedelta(days=30),
-            "effective_to": None,
-            "active": True,
-        }
-    )
+    seeded_db.commit()
+
     facility = (await client.get("/api/v1/facilities/M3")).json()
     private = [t for t in facility["tariffs"] if t["category"] == "PRIVATE"]
     assert len(private) == 1
     assert private[0]["amount"] == 12000
+
+
+async def test_expired_tariff_is_not_shown(client, seeded_db):
+    m4_id = seeded_db.scalar(select(Facility.id).where(Facility.code == "M4"))
+    seeded_db.execute(
+        update(Tariff)
+        .where(Tariff.facility_id == m4_id, Tariff.category == "GOVT")
+        .values(effective_to=datetime.now(UTC) - timedelta(seconds=1))
+    )
+    seeded_db.commit()
+    facility = (await client.get("/api/v1/facilities/M4")).json()
+    assert {t["category"] for t in facility["tariffs"]} == {"PRIVATE", "IIT"}
 
 
 async def test_get_facility_by_code_and_404(client):

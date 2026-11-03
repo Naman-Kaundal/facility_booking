@@ -1,44 +1,63 @@
+from sqlalchemy import func, select, update
+
+from app.db.models import Facility, FacilitySlotType, SlotWindow, Tariff
 from app.db.seed import seed_all
 from app.db.seed_data import FACILITIES, TARIFFS
 
-EXPECTED_TARIFFS = sum(len(amounts) for amounts in TARIFFS.values())  # 11 facility/unit rows x 3 categories
+EXPECTED = {
+    "facilities": len(FACILITIES),  # 10
+    "facility_slot_types": 11,  # every facility has one, the Auditorium complete space has two
+    "tariffs": sum(len(amounts) for amounts in TARIFFS.values()),  # 11 facility/unit rows x 3 categories = 33
+    "slot_windows": 16,
+}
+MODELS = {
+    "facilities": Facility,
+    "facility_slot_types": FacilitySlotType,
+    "tariffs": Tariff,
+    "slot_windows": SlotWindow,
+}
 
 
-async def test_first_seed_inserts_everything(db):
-    report = await seed_all(db)
-    assert report.inserted["facilities"] == len(FACILITIES)
-    assert report.inserted["tariffs"] == EXPECTED_TARIFFS == 33
-    assert report.existing == {"facilities": 0, "tariffs": 0, "slot_windows": 0}
-    assert await db.facilities.count_documents({}) == 10
-    assert await db.tariffs.count_documents({}) == 33
+def _counts(db) -> dict[str, int]:
+    return {name: db.scalar(select(func.count()).select_from(model)) for name, model in MODELS.items()}
 
 
-async def test_seed_is_idempotent(db):
-    await seed_all(db)
-    counts_before = {name: await db[name].count_documents({}) for name in ("facilities", "tariffs", "slot_windows")}
-
-    report = await seed_all(db)
-
-    counts_after = {name: await db[name].count_documents({}) for name in ("facilities", "tariffs", "slot_windows")}
-    assert counts_after == counts_before
-    assert report.inserted == {"facilities": 0, "tariffs": 0, "slot_windows": 0}
-    assert report.existing["facilities"] == len(FACILITIES)
+def test_first_seed_inserts_everything(db):
+    report = seed_all(db)
+    assert report.inserted == EXPECTED
+    assert set(report.existing.values()) == {0}
+    assert _counts(db) == EXPECTED
+    assert EXPECTED["tariffs"] == 33
 
 
-async def test_rerunning_seed_does_not_overwrite_admin_changes(db):
-    await seed_all(db)
-    m5 = await db.facilities.find_one({"code": "M5"})
-    await db.tariffs.update_one(
-        {"facility_id": m5["_id"], "category": "PRIVATE", "unit": "FULL_DAY"}, {"$set": {"amount": 16000}}
+def test_seed_is_idempotent(db):
+    seed_all(db)
+    report = seed_all(db)
+    assert _counts(db) == EXPECTED
+    assert set(report.inserted.values()) == {0}
+    assert report.existing == EXPECTED
+
+
+def test_rerunning_seed_does_not_overwrite_admin_changes(db):
+    seed_all(db)
+    m5_id = db.scalar(select(Facility.id).where(Facility.code == "M5"))
+    db.execute(
+        update(Tariff)
+        .where(Tariff.facility_id == m5_id, Tariff.category == "PRIVATE", Tariff.unit == "FULL_DAY")
+        .values(amount=16000)
     )
+    db.commit()
 
-    await seed_all(db)
+    seed_all(db)
 
-    tariff = await db.tariffs.find_one({"facility_id": m5["_id"], "category": "PRIVATE", "unit": "FULL_DAY"})
-    assert tariff["amount"] == 16000
+    amount = db.scalar(
+        select(Tariff.amount).where(
+            Tariff.facility_id == m5_id, Tariff.category == "PRIVATE", Tariff.unit == "FULL_DAY"
+        )
+    )
+    assert amount == 16000
 
 
-async def test_no_charge_tariffs_are_stored_as_zero_not_null(db):
-    await seed_all(db)
-    assert await db.tariffs.count_documents({"amount": None}) == 0
-    assert await db.tariffs.count_documents({"amount": 0}) == 3  # IIT rate for cricket, football, hockey
+def test_no_charge_tariffs_are_stored_as_zero(db):
+    seed_all(db)
+    assert db.scalar(select(func.count()).select_from(Tariff).where(Tariff.amount == 0)) == 3

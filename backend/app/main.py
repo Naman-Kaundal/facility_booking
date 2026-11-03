@@ -3,45 +3,42 @@
 Run locally with:  uvicorn app.main:app --reload --port 8000
 """
 
-import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session, sessionmaker
 
-from app.api import facilities, health
-from app.core.config import Settings, get_settings
+from app.api import auth, availability, facilities, health, requests, users, workflow
+from app.core.config import INSECURE_DEFAULT_SECRET, Settings, get_settings
 from app.core.errors import register_error_handlers
-from app.db.indexes import ensure_indexes
-from app.db.mongo import create_client
+from app.db.session import create_session_factory
 
 API_PREFIX = "/api/v1"
-logger = logging.getLogger(__name__)
 
 
-def create_app(settings: Settings | None = None, database=None) -> FastAPI:
-    """Build the app. Pass ``database`` (e.g. a mock) to skip connecting to MongoDB."""
+def create_app(settings: Settings | None = None, session_factory: sessionmaker[Session] | None = None) -> FastAPI:
+    """Build the app. Tests pass their own ``session_factory`` bound to the test database.
+
+    The schema is created by Alembic migrations (`alembic upgrade head`), not at startup.
+    """
     settings = settings or get_settings()
+    if settings.app_env not in ("development", "test") and settings.app_secret_key == INSECURE_DEFAULT_SECRET:
+        raise RuntimeError("Set APP_SECRET_KEY to a long random value outside development.")
+    owns_engine = session_factory is None
+    session_factory = session_factory or create_session_factory(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        client = None
-        if database is None:
-            client = create_client(settings)
-            app.state.db = client[settings.mongodb_database]
-            try:
-                await ensure_indexes(app.state.db)
-            except Exception:  # noqa: BLE001 - keep serving so /health can report the problem
-                logger.warning("Could not ensure MongoDB indexes; is MongoDB running at the configured URI?")
         try:
             yield
         finally:
-            if client is not None:
-                client.close()
+            if owns_engine:
+                session_factory.kw["bind"].dispose()
 
-    app = FastAPI(title=settings.app_name, version="0.1.0-week1", lifespan=lifespan)
-    if database is not None:
-        app.state.db = database
+    app = FastAPI(title=settings.app_name, version="0.4.0-week3", lifespan=lifespan)
+    app.state.settings = settings
+    app.state.session_factory = session_factory
 
     app.add_middleware(
         CORSMiddleware,
@@ -54,6 +51,11 @@ def create_app(settings: Settings | None = None, database=None) -> FastAPI:
 
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(facilities.router, prefix=API_PREFIX)
+    app.include_router(auth.router, prefix=API_PREFIX)
+    app.include_router(users.router, prefix=API_PREFIX)
+    app.include_router(requests.router, prefix=API_PREFIX)
+    app.include_router(availability.router, prefix=API_PREFIX)
+    app.include_router(workflow.router, prefix=API_PREFIX)
     return app
 
 
