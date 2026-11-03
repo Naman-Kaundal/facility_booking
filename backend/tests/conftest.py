@@ -27,6 +27,7 @@ from app.services.auth_service import create_session, sign_in_user
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TABLES = (
+    "email_logs, admin_audit_events, request_costs, app_settings, "
     "reservations, status_events, reference_counters, staff_roles, request_lines, requests, sessions, users, "
     "slot_windows, tariffs, facility_slot_types, facilities"
 )
@@ -131,9 +132,37 @@ async def offline_client(settings):
     dead.dispose()
 
 
+class FakeEmailSender:
+    """Records emails instead of sending them. Set ``fail_next`` to simulate an SMTP outage."""
+
+    def __init__(self) -> None:
+        self.sent = []
+        self.fail_next = 0
+
+    def send(self, message):
+        if self.fail_next:
+            self.fail_next -= 1
+            raise ConnectionError("SMTP server unavailable (simulated)")
+        self.sent.append(message)
+        return f"fake-{len(self.sent)}"
+
+    def to(self, recipient: str) -> list:
+        return [m for m in self.sent if m.to == recipient]
+
+    def subjects(self, recipient: str) -> list[str]:
+        return [m.subject for m in self.to(recipient)]
+
+
 @pytest.fixture
-def app(settings, session_factory, seeded_db):
-    return create_app(settings=settings, session_factory=session_factory)
+def outbox() -> FakeEmailSender:
+    return FakeEmailSender()
+
+
+@pytest.fixture
+def app(settings, session_factory, seeded_db, outbox):
+    application = create_app(settings=settings, session_factory=session_factory)
+    application.state.email_sender = outbox
+    return application
 
 
 class SignedIn:

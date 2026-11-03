@@ -1,4 +1,4 @@
-"""Shared helpers for the workflow tests: build a draft, submit it, forward it."""
+"""Shared helpers for the workflow tests: build a draft, submit it, forward it, decide, cost it."""
 
 from datetime import timedelta
 
@@ -57,3 +57,26 @@ async def decide(staff, request_id: int, line: int, decision: str, remark: str |
     return await staff.post(
         f"/api/v1/requests/{request_id}/decision", json={"line_id": line, "decision": decision, "remark": remark}
     )
+
+
+async def with_estate(people, facility_ids, *lines) -> dict:
+    """A request whose lines are all CONFIRMED by their sections (status WITH_ESTATE)."""
+    request = await forwarded(people["requester"], people["facility"], facility_ids, *lines)
+    for line in request["lines"]:
+        desk = people["academic"] if line["section"] == "ACADEMIC" else people["sports"]
+        response = await decide(desk, request["id"], line["id"], "CONFIRMED")
+        assert response.status_code == 200, response.text
+    body = response.json()["request"]
+    assert body["status"] == "WITH_ESTATE", body["status"]
+    return body
+
+
+async def enter_electricity(estate, request_id: int, amount, remark: str | None = None):
+    return await estate.post(
+        f"/api/v1/requests/{request_id}/electricity", json={"electricity_estimate": amount, "remark": remark}
+    )
+
+
+async def set_payment_url(admin, url: str = "https://payments.example.org/test-only") -> None:
+    response = await admin.patch("/api/v1/admin/settings", json={"payment_url": url})
+    assert response.status_code == 200, response.text

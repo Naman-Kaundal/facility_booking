@@ -7,6 +7,7 @@ Constraint names are written out explicitly so the models and migrations always 
 """
 
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     Time,
@@ -47,6 +49,7 @@ REQUEST_STATUSES = (
 )
 LINE_DECISIONS = ("PENDING", "CONFIRMED", "REJECTED")
 STAFF_ROLES = ("FACILITY", "ACADEMIC", "SPORTS", "ESTATE", "ADMIN")
+EMAIL_STATUSES = ("PENDING", "SENT", "FAILED")
 
 
 def in_list(column: str, values: tuple[str, ...]) -> str:
@@ -240,6 +243,9 @@ class BookingRequest(TimestampMixin, Base):
     return_reason: Mapped[str | None] = mapped_column(Text)
     returned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Week 4: the cost breakdown, once Estate has entered the electricity estimate.
+    cost: Mapped["RequestCost | None"] = relationship(lazy="selectin", cascade="all, delete-orphan")
+
     lines: Mapped[list["RequestLine"]] = relationship(
         back_populates="request",
         cascade="all, delete-orphan",
@@ -399,3 +405,139 @@ class StaffRole(Base):
         CheckConstraint("email = lower(email)", name="ck_staff_roles_email_lowercase"),
         Index("ix_staff_roles_role_active", "role", "active"),
     )
+
+
+# ---------------------------------------------------------------------------------------------
+# Week 4: settings, costing, email log, admin audit
+# ---------------------------------------------------------------------------------------------
+
+MONEY = Numeric(12, 2)
+PERCENT = Numeric(5, 2)
+
+
+class AppSettings(Base):
+    """Institute-wide cost settings and the payment link (LLD §9.1, §10.10). Exactly one row (id = 1).
+
+    Changing these affects requests costed afterwards; costed requests keep their own snapshot.
+    """
+
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    gst_pct: Mapped[Decimal] = mapped_column(PERCENT)
+    cleaning_pct: Mapped[Decimal] = mapped_column(PERCENT)
+    security_deposit: Mapped[int] = mapped_column(Integer)  # whole rupees, per request
+    electricity_advance_pct: Mapped[Decimal] = mapped_column(PERCENT)
+    # The institute's payment page. NULL until an admin configures it (never invented by the app).
+    payment_url: Mapped[str | None] = mapped_column(String(500))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    updated_by: Mapped[str | None] = mapped_column(String(320))
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_app_settings_singleton"),
+        CheckConstraint("gst_pct >= 0 AND gst_pct <= 100", name="ck_app_settings_gst_pct_range"),
+        CheckConstraint("cleaning_pct >= 0 AND cleaning_pct <= 100", name="ck_app_settings_cleaning_pct_range"),
+        CheckConstraint(
+            "electricity_advance_pct >= 0 AND electricity_advance_pct <= 100",
+            name="ck_app_settings_electricity_advance_pct_range",
+        ),
+        CheckConstraint("security_deposit >= 0", name="ck_app_settings_deposit_non_negative"),
+    )
+
+
+class RequestCost(Base):
+    """The cost breakdown of one request (LLD §9.3), calculated by the backend only.
+
+    Every input (rates, percentages, deposit, electricity) is copied here, so changing the
+    settings or tariffs later never changes a request that has already been costed.
+    """
+
+    __tablename__ = "request_costs"
+
+    request_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    booking_subtotal: Mapped[Decimal] = mapped_column(MONEY)
+    gst_pct: Mapped[Decimal] = mapped_column(PERCENT)
+    gst_amount: Mapped[Decimal] = mapped_column(MONEY)
+    cleaning_pct: Mapped[Decimal] = mapped_column(PERCENT)
+    cleaning_amount: Mapped[Decimal] = mapped_column(MONEY)
+    security_deposit: Mapped[Decimal] = mapped_column(MONEY)
+    electricity_estimate: Mapped[Decimal] = mapped_column(MONEY)
+    electricity_advance_pct: Mapped[Decimal] = mapped_column(PERCENT)
+    electricity_advance: Mapped[Decimal] = mapped_column(MONEY)
+    total_estimated_cost: Mapped[Decimal] = mapped_column(MONEY)
+    advance_amount: Mapped[Decimal] = mapped_column(MONEY)
+    estimate_remark: Mapped[str | None] = mapped_column(Text)
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    calculated_by: Mapped[int | None] = mapped_column(Integer)
+    # Filled when Facilities sends the advance intimation.
+    payment_url_snapshot: Mapped[str | None] = mapped_column(String(500))
+    intimated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    intimated_by: Mapped[int | None] = mapped_column(Integer)
+
+    calculator: Mapped["User | None"] = relationship(
+        foreign_keys="RequestCost.calculated_by", viewonly=True, lazy="joined"
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(["request_id"], ["requests.id"], name="fk_request_costs_request_id", ondelete="CASCADE"),
+        ForeignKeyConstraint(["calculated_by"], ["users.id"], name="fk_request_costs_calculated_by"),
+        ForeignKeyConstraint(["intimated_by"], ["users.id"], name="fk_request_costs_intimated_by"),
+        CheckConstraint(
+            "booking_subtotal >= 0 AND gst_amount >= 0 AND cleaning_amount >= 0 AND security_deposit >= 0 "
+            "AND electricity_estimate >= 0 AND electricity_advance >= 0 AND total_estimated_cost >= 0 "
+            "AND advance_amount >= 0",
+            name="ck_request_costs_amounts_non_negative",
+        ),
+    )
+
+
+class EmailLog(Base):
+    """Every email the app tries to send (LLD §10.9, §14): written before sending, then updated.
+
+    ``idempotency_key`` stops the same notification being queued twice for one workflow event.
+    """
+
+    __tablename__ = "email_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[int | None] = mapped_column(Integer)
+    event: Mapped[str] = mapped_column(String(40))
+    recipient: Mapped[str] = mapped_column(String(320))
+    subject: Mapped[str] = mapped_column(String(300))
+    body_text: Mapped[str] = mapped_column(Text)
+    body_html: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), server_default=text("'PENDING'"))
+    attempt_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(Text)
+    provider_message_id: Mapped[str | None] = mapped_column(String(200))
+    idempotency_key: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        ForeignKeyConstraint(["request_id"], ["requests.id"], name="fk_email_logs_request_id", ondelete="SET NULL"),
+        UniqueConstraint("idempotency_key", name="uq_email_logs_idempotency_key"),
+        CheckConstraint(in_list("status", EMAIL_STATUSES), name="ck_email_logs_status_valid"),
+        CheckConstraint("attempt_count >= 0", name="ck_email_logs_attempts_non_negative"),
+        Index("ix_email_logs_status_created", "status", "created_at"),
+        Index("ix_email_logs_request_created", "request_id", "created_at"),
+    )
+
+
+class AdminAuditEvent(Base):
+    """Append-only log of admin changes to master data, settings and roles (LLD §15)."""
+
+    __tablename__ = "admin_audit_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    actor_email: Mapped[str] = mapped_column(String(320))
+    action: Mapped[str] = mapped_column(String(40))
+    entity: Mapped[str] = mapped_column(String(40))
+    entity_id: Mapped[str | None] = mapped_column(String(64))
+    details: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_admin_audit_events_created", "created_at"),)
