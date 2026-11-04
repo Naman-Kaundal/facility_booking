@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.costs import CostBreakdownOut
 from app.schemas.facility import Category, Section, Unit
 
 PHONE_CHARS = re.compile(r"^\+?[0-9 ()\-]{6,20}$")
@@ -126,7 +127,7 @@ class ChargesPreviewOut(BaseModel):
     # Sum of line rates, excluding lines a section has rejected.
     booking_subtotal: int
     lines_without_rate: int
-    # Always False until Week 4: final costs (GST, cleaning, deposit, electricity) come later.
+    # True once Facilities has sent the advance intimation (the full breakdown is in ``costs``).
     is_final: bool = False
     note: str
 
@@ -147,6 +148,8 @@ class RequestOut(BaseModel):
     terms_version: str | None = None
     return_reason: str | None = None
     returned_at: datetime | None = None
+    # Week 4: staff see it once costed; the requester sees it after the advance intimation.
+    costs: CostBreakdownOut | None = None
 
 
 class RequestSummaryOut(BaseModel):

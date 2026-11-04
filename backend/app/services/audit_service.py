@@ -15,6 +15,11 @@ EVENT_LABELS = {
     "LINE_CONFIRMED": "Facility confirmed",
     "LINE_REJECTED": "Facility rejected",
     "STATUS_CHANGED": "Status changed",
+    "ELECTRICITY_SUBMITTED": "Electricity estimate entered",
+    "ELECTRICITY_REVISED": "Electricity estimate revised",
+    "COST_CALCULATED": "Costs calculated",
+    "COST_RECALCULATED": "Costs recalculated",
+    "ADVANCE_INTIMATED": "Advance intimation sent",
 }
 
 

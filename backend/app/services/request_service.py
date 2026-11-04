@@ -29,6 +29,7 @@ from app.schemas.request import (
     RequestOut,
     RequestSummaryOut,
 )
+from app.services import costing_service
 from app.services.slots import slots_overlap
 
 EDITABLE_STATUSES = {"DRAFT", "RETURNED"}
@@ -37,6 +38,10 @@ MAX_DAYS_AHEAD = 365  # Assumption: bookings up to a year ahead; confirm with Fa
 PREVIEW_NOTE = (
     "Indicative booking charges only. GST, cleaning, security deposit and electricity are "
     "added when Facilities costs the request."
+)
+FINAL_NOTE = (
+    "Final booking charges. The cost breakdown shows GST, cleaning, the security deposit, electricity and "
+    "the advance to pay."
 )
 
 
@@ -182,14 +187,22 @@ class RequestService:
         return slot
 
     def _detail(self, user: User, request: BookingRequest) -> RequestOut:
-        return build_request_out(self.facilities, request, user.rate_category)
+        # The requester sees the cost breakdown once Facilities has sent the advance intimation.
+        return build_request_out(
+            self.facilities, request, user.rate_category, include_costs=request.status == "ADVANCE_INTIMATED"
+        )
 
     @staticmethod
     def _summary(request: BookingRequest) -> RequestSummaryOut:
         return build_summary(request)
 
 
-def build_request_out(facilities: FacilityRepository, request: BookingRequest, live_category: str | None) -> RequestOut:
+def build_request_out(
+    facilities: FacilityRepository,
+    request: BookingRequest,
+    live_category: str | None,
+    include_costs: bool = False,
+) -> RequestOut:
     """Request detail for the requester or staff.
 
     Drafts (and returned requests) preview the current tariff for ``live_category``.
@@ -242,6 +255,8 @@ def build_request_out(facilities: FacilityRepository, request: BookingRequest, l
                 decided_at=line.decided_at,
             )
         )
+    costs = costing_service.cost_out(request) if include_costs else None
+    final = costs is not None and costs.is_final
     return RequestOut(
         id=request.id,
         ref_no=request.ref_no,
@@ -258,7 +273,11 @@ def build_request_out(facilities: FacilityRepository, request: BookingRequest, l
         ),
         lines=lines,
         charges_preview=ChargesPreviewOut(
-            category=category, booking_subtotal=subtotal, lines_without_rate=missing, note=PREVIEW_NOTE
+            category=category,
+            booking_subtotal=subtotal,
+            lines_without_rate=missing,
+            is_final=final,
+            note=FINAL_NOTE if final else PREVIEW_NOTE,
         ),
         created_at=request.created_at,
         updated_at=request.updated_at,
@@ -267,6 +286,7 @@ def build_request_out(facilities: FacilityRepository, request: BookingRequest, l
         terms_version=request.terms_version,
         return_reason=request.return_reason,
         returned_at=request.returned_at,
+        costs=costs,
     )
 
 

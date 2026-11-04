@@ -1,11 +1,12 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.request import RequestOut, TimelineEventOut
 
-Desk = Literal["FACILITY", "ACADEMIC", "SPORTS"]
+Desk = Literal["FACILITY", "ACADEMIC", "SPORTS", "ESTATE"]
 
 _INPUT = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -42,6 +43,10 @@ class StaffRequestOut(BaseModel):
     can_forward: bool
     can_return: bool
     decidable_line_ids: list[int]
+    # Week 4
+    can_enter_electricity: bool = False
+    can_intimate: bool = False
+    payment_url_configured: bool = False
 
 
 class ForwardIn(BaseModel):
@@ -61,4 +66,19 @@ class DecisionIn(BaseModel):
 
     line_id: int = Field(gt=0)
     decision: Literal["CONFIRMED", "REJECTED"]
+    remark: str | None = Field(default=None, max_length=1000)
+
+
+class ElectricityIn(BaseModel):
+    """Estate's approximate electricity charge. Every other amount is calculated by the server."""
+
+    model_config = _INPUT
+
+    electricity_estimate: Decimal = Field(ge=0, le=10_000_000, max_digits=10, decimal_places=2)
+    remark: str | None = Field(default=None, max_length=1000)
+
+
+class IntimateIn(BaseModel):
+    model_config = _INPUT
+
     remark: str | None = Field(default=None, max_length=1000)
