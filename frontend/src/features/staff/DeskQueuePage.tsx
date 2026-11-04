@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { errorMessage } from "../../api/client";
 import { getQueue } from "../../api/workflow";
 import { ErrorState, LoadingState } from "../../components/States";
+import { StatusBadge } from "../../components/StatusBadge";
+import type { RequestStatus } from "../../types/request";
 import type { Desk, Queue } from "../../types/workflow";
 import { SECTION_LABELS, formatDate, formatDateTime } from "../../utils/format";
 import { DESKS } from "./desks";
@@ -25,7 +27,7 @@ export function DeskQueuePage({ desk }: { desk: Desk }) {
   if (error) return <ErrorState title="Couldn't load the queue" message={error} onRetry={load} />;
   if (!queue) return <LoadingState label="Loading queue…" />;
 
-  const sectionDesk = desk !== "FACILITY";
+  const sectionDesk = desk === "ACADEMIC" || desk === "SPORTS";
 
   return (
     <section className="page" aria-labelledby="desk-heading">
@@ -52,6 +54,7 @@ export function DeskQueuePage({ desk }: { desk: Desk }) {
             <thead>
               <tr>
                 <th scope="col">Reference</th>
+                <th scope="col">Stage</th>
                 <th scope="col">Event</th>
                 <th scope="col">Requester</th>
                 <th scope="col">First date</th>
@@ -64,6 +67,9 @@ export function DeskQueuePage({ desk }: { desk: Desk }) {
                 <tr key={item.id}>
                   <td>
                     <Link to={`/desk/requests/${item.id}?desk=${desk}`}>{item.ref_no ?? `#${item.id}`}</Link>
+                  </td>
+                  <td>
+                    <StatusBadge status={item.status as RequestStatus} />
                   </td>
                   <td>{item.purpose}</td>
                   <td>

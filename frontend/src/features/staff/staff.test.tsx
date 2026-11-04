@@ -67,6 +67,9 @@ function staffView(overrides: Partial<StaffRequest> = {}, req: Partial<BookingRe
     can_forward: true,
     can_return: true,
     decidable_line_ids: [],
+    can_enter_electricity: false,
+    can_intimate: false,
+    payment_url_configured: false,
     ...overrides,
   };
 }

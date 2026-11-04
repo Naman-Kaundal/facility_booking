@@ -1,20 +1,32 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { errorMessage } from "../../api/client";
-import { decideLine, forwardRequest, getStaffRequest, returnRequest } from "../../api/workflow";
+import { useAuth } from "../../auth/AuthContext";
+import {
+  decideLine,
+  forwardRequest,
+  getStaffRequest,
+  intimateAdvance,
+  returnRequest,
+  submitElectricity,
+} from "../../api/workflow";
+import { CostBreakdown } from "../../components/CostBreakdown";
 import { DecisionBadge } from "../../components/DecisionBadge";
 import { StatusBadge } from "../../components/StatusBadge";
 import { ErrorState, LoadingState } from "../../components/States";
 import { Timeline } from "../../components/Timeline";
-import type { DecisionInput, StaffRequest } from "../../types/workflow";
+import type { DecisionInput, ElectricityInput, StaffRequest } from "../../types/workflow";
 import { CATEGORY_LABELS, SECTION_LABELS, formatDate, formatDateTime, formatInr, formatTotal } from "../../utils/format";
 import { DecisionForm } from "./DecisionForm";
 import { DESKS } from "./desks";
+import { ElectricityForm } from "./ElectricityForm";
+import { IntimationPanel } from "./IntimationPanel";
 import "../../styles/staff.css";
 
 /** One request as staff see it, with the actions this person may take. */
 export function StaffRequestPage() {
   const id = Number(useParams().id);
+  const { user } = useAuth();
   const [params] = useSearchParams();
   const back = DESKS.find((d) => d.desk === params.get("desk"));
   const [data, setData] = useState<StaffRequest | null>(null);
@@ -67,6 +79,16 @@ export function StaffRequestPage() {
 
   const decide = (input: DecisionInput) =>
     act(() => decideLine(id, input), input.decision === "CONFIRMED" ? "Line confirmed." : "Line rejected.");
+
+  const enterElectricity = (input: ElectricityInput) =>
+    act(() => submitElectricity(id, input), "Estimate saved. The costs have been calculated.");
+
+  const sendAdvance = (remark?: string) =>
+    act(() => intimateAdvance(id, remark), "Advance intimation sent to the requester.");
+
+  const costs = request.costs ?? null;
+  // Only the Facilities desk sends the advance; the server checks the role again.
+  const showIntimation = request.status === "COSTED" && costs !== null && Boolean(user?.roles?.includes("FACILITY"));
 
   return (
     <section className="page" aria-labelledby="staff-heading">
@@ -170,6 +192,40 @@ export function StaffRequestPage() {
           </div>
         </div>
       </div>
+
+      {data.can_enter_electricity && (
+        <ElectricityForm
+          key={costs?.calculated_at ?? "new"}
+          initial={costs?.electricity_estimate}
+          revising={request.status === "COSTED"}
+          busy={busy}
+          onSubmit={enterElectricity}
+        />
+      )}
+
+      {costs && (
+        <div className="panel">
+          <CostBreakdown costs={costs} />
+          {costs.payment_url && (
+            <p className="hint">
+              Payment link sent:{" "}
+              <a href={costs.payment_url} target="_blank" rel="noopener noreferrer">
+                {costs.payment_url}
+              </a>
+            </p>
+          )}
+        </div>
+      )}
+
+      {showIntimation && costs && (
+        <IntimationPanel
+          advance={costs.advance_amount}
+          paymentConfigured={data.payment_url_configured}
+          canIntimate={data.can_intimate}
+          busy={busy}
+          onSend={sendAdvance}
+        />
+      )}
 
       {(data.can_forward || data.can_return) && (
         <div className="panel staff-actions">

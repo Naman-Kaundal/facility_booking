@@ -15,7 +15,7 @@ export const DESKS: DeskInfo[] = [
     path: "/desk/facilities",
     title: "Facilities desk",
     short: "Facilities",
-    description: "Check new requests, then forward them to the sections or return them for correction.",
+    description: "Check new requests, forward or return them, and send the advance intimation once costed.",
   },
   {
     desk: "ACADEMIC",
@@ -30,6 +30,13 @@ export const DESKS: DeskInfo[] = [
     title: "Sports desk",
     short: "Sports",
     description: "Confirm or reject sports ground and court bookings.",
+  },
+  {
+    desk: "ESTATE",
+    path: "/desk/estate",
+    title: "Estate desk",
+    short: "Estate",
+    description: "Enter the approximate electricity charge once every section has decided.",
   },
 ];
 

@@ -1,7 +1,7 @@
 import type { BookingRequest, TimelineEvent } from "./request";
 import type { Section } from "./facility";
 
-export type Desk = "FACILITY" | "ACADEMIC" | "SPORTS";
+export type Desk = "FACILITY" | "ACADEMIC" | "SPORTS" | "ESTATE";
 
 export interface QueueItem {
   id: number;
@@ -35,10 +35,18 @@ export interface StaffRequest {
   can_forward: boolean;
   can_return: boolean;
   decidable_line_ids: number[];
+  can_enter_electricity: boolean;
+  can_intimate: boolean;
+  payment_url_configured: boolean;
 }
 
 export interface DecisionInput {
   line_id: number;
   decision: "CONFIRMED" | "REJECTED";
+  remark?: string;
+}
+
+export interface ElectricityInput {
+  electricity_estimate: number;
   remark?: string;
 }
