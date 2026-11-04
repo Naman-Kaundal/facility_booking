@@ -8,6 +8,7 @@ export function HomePage() {
   const { user } = useAuth();
   if (!user) return null;
   const desks = desksFor(user.roles);
+  const isAdmin = user.roles?.includes("ADMIN") ?? false;
 
   return (
     <section className="page" aria-labelledby="home-heading">
@@ -24,7 +25,7 @@ export function HomePage() {
         </p>
       </div>
 
-      {desks.length > 0 && (
+      {(desks.length > 0 || isAdmin) && (
         <>
           <h2>Your desks</h2>
           <div className="home-cards">
@@ -34,6 +35,14 @@ export function HomePage() {
                 <span className="home-card__text">{d.description}</span>
               </Link>
             ))}
+            {isAdmin && (
+              <Link to="/admin" className="home-card home-card--staff">
+                <span className="home-card__title">Administration</span>
+                <span className="home-card__text">
+                  Cost settings, payment link, staff roles, facilities, rates, slots and the email log.
+                </span>
+              </Link>
+            )}
           </div>
           <h2>Bookings</h2>
         </>

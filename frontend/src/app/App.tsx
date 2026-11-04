@@ -4,6 +4,7 @@ import { RequireAuth } from "../auth/RequireAuth";
 import { RequireRole } from "../auth/RequireRole";
 import { AppHeader } from "../components/AppHeader";
 import { ApiStatus } from "../components/ApiStatus";
+import { AdminPage } from "../features/admin/AdminPage";
 import { CategoryPage } from "../features/auth/CategoryPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { FacilityCatalogue } from "../features/facilities/FacilityCatalogue";
@@ -82,9 +83,25 @@ export function App() {
             }
           />
           <Route
+            path="/desk/estate"
+            element={
+              <RequireRole roles={["ESTATE"]}>
+                <DeskQueuePage desk="ESTATE" />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireRole roles={["ADMIN"]}>
+                <AdminPage />
+              </RequireRole>
+            }
+          />
+          <Route
             path="/desk/requests/:id"
             element={
-              <RequireRole roles={["FACILITY", "ACADEMIC", "SPORTS", "ADMIN"]}>
+              <RequireRole roles={["FACILITY", "ACADEMIC", "SPORTS", "ESTATE", "ADMIN"]}>
                 <StaffRequestPage />
               </RequireRole>
             }

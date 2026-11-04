@@ -34,6 +34,11 @@ export function AppHeader() {
                   {d.short} desk
                 </NavLink>
               ))}
+              {me.roles?.includes("ADMIN") && (
+                <NavLink to="/admin" className="app-header__link">
+                  Admin
+                </NavLink>
+              )}
             </>
           )}
           <NavLink to="/facilities" className="app-header__link">

@@ -1,0 +1,104 @@
+/* Week 4: admin pages */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 16px;
+}
+.tabs__tab {
+  border: 0;
+  background: none;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+.tabs__tab:hover {
+  color: var(--navy-700);
+}
+.tabs__tab.is-active {
+  color: var(--navy-900);
+  border-bottom-color: var(--navy-700);
+}
+.tabs__tab:focus-visible {
+  outline: 3px solid var(--accent);
+}
+
+.admin-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  margin: 12px 0;
+}
+.admin-inline-form .field {
+  margin: 0;
+  min-width: 140px;
+}
+
+.admin-catalogue {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .admin-catalogue {
+    grid-template-columns: 1fr;
+  }
+}
+.admin-catalogue__list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.admin-catalogue__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.admin-catalogue__item:hover {
+  background: var(--page);
+}
+.admin-catalogue__item.is-selected {
+  background: var(--navy-100);
+  color: var(--navy-900);
+  font-weight: 600;
+}
+.admin-slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.admin-slots li {
+  border-bottom: 1px solid var(--line);
+}
+
+tr.is-inactive td,
+li.is-inactive {
+  color: var(--ink-muted);
+}
+
+.email-status {
+  font-weight: 700;
+}
+.email-status--sent {
+  color: var(--success);
+}
+.email-status--failed {
+  color: var(--danger);
+}
