@@ -13,6 +13,7 @@ from app.db.models import User, UserSession
 from app.db.session import get_db
 from app.services import roles_service
 from app.services.auth_service import find_session
+from app.services.notification_service import Notifier
 
 SESSION_COOKIE = "fb_session"
 CSRF_HEADER = "X-CSRF-Token"
@@ -64,3 +65,9 @@ def require_role(*allowed: str) -> Callable[..., StaffContext]:
         return StaffContext(user=user, roles=roles)
 
     return dependency
+
+
+def get_notifier(request: Request, db: Session = Depends(get_db)) -> Notifier:
+    """Email notifier for this API call (shares the call's database session)."""
+    settings: Settings = request.app.state.settings
+    return Notifier(db, request.app.state.email_sender, settings.frontend_base_url, settings.email_max_attempts)

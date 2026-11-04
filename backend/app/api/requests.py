@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_notifier
 from app.db.models import User
 from app.db.session import get_db
 from app.schemas.request import (
@@ -16,6 +16,7 @@ from app.schemas.request import (
     TimelineEventOut,
 )
 from app.services import audit_service
+from app.services.notification_service import Notifier
 from app.services.request_service import RequestService
 from app.services.submission_service import SubmissionService, current_terms
 
@@ -111,9 +112,10 @@ def submit_request(
     body: SubmitIn,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    notifier: Notifier = Depends(get_notifier),
 ) -> RequestOut:
     """Submit a draft (or a returned request) to Facilities. Assigns the reference number."""
-    return SubmissionService(db).submit(user, request_id, body)
+    return SubmissionService(db, notifier).submit(user, request_id, body)
 
 
 @router.get("/{request_id}/events", response_model=list[TimelineEventOut])

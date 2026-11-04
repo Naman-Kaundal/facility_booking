@@ -7,7 +7,8 @@ On submission the backend:
 3. freezes the rate category, tariff and facility details on each line (snapshots), so later
    tariff or profile changes can't alter the request;
 4. assigns a reference number FB-YYYY-NNN from an atomic counter (first submission only);
-5. moves the request to SUBMITTED and records the event in the audit log.
+5. moves the request to SUBMITTED, records the event in the audit log and emails the requester
+   and the Facilities desk (Week 4).
 """
 
 from sqlalchemy import select
@@ -21,6 +22,7 @@ from app.repositories.facilities import FacilityRepository
 from app.schemas.request import RequestOut, SubmitIn, TermsOut
 from app.services import audit_service
 from app.services.availability_service import AvailabilityService
+from app.services.notification_service import Notifier
 from app.services.request_service import EDITABLE_STATUSES, RequestService
 
 # Placeholder until DR Facilities supplies the approved terms (LLD §19 item 9). Bump the version
@@ -65,8 +67,9 @@ def next_reference(db: Session, year: int) -> str:
 
 
 class SubmissionService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, notifier: Notifier | None = None) -> None:
         self.db = db
+        self.notifier = notifier
         self.requests = RequestService(db)
         self.facilities = FacilityRepository(db)
         self.availability = AvailabilityService(db)
@@ -136,10 +139,16 @@ class SubmissionService:
         request.rate_category_snapshot = user.rate_category
         request.terms_version = data.terms_version
         request.terms_accepted_at = utc_now()
-        audit_service.record(
+        event = audit_service.record(
             self.db, request, "RESUBMITTED" if resubmission else "SUBMITTED",
             actor=user, role="REQUESTER", from_status=previous, to_status="SUBMITTED",
         )
+        if self.notifier:
+            note = "This is the corrected version of your request." if resubmission else None
+            self.notifier.notify_requester(request, "REQUEST_SUBMITTED", event, note=note)
+            self.notifier.notify_role("FACILITY", request, "FACILITY_REVIEW_REQUIRED", event, note=note)
         self.db.commit()
+        if self.notifier:
+            self.notifier.send_queued()
         self.db.expire_all()
         return self.requests.detail(user, request.id)

@@ -16,6 +16,12 @@ def active_roles(db: Session, email: str) -> list[str]:
     return sorted(db.scalars(stmt))
 
 
+def emails_with_role(db: Session, role: str) -> list[str]:
+    """Active staff emails for a desk role (used to address notifications)."""
+    stmt = select(StaffRole.email).where(StaffRole.role == role, StaffRole.active.is_(True)).order_by(StaffRole.email)
+    return list(db.scalars(stmt))
+
+
 def grant(db: Session, email: str, role: str, assigned_by: str | None = None) -> None:
     """Give (or re-activate) a role. Safe to run more than once."""
     role = role.upper()

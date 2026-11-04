@@ -1,6 +1,7 @@
 """Application configuration loaded from environment variables (and an optional .env file)."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +46,19 @@ class Settings(BaseSettings):
     # Development-only sign-in without Google, for testing when an account can't use the
     # OAuth app. Ignored unless APP_ENV is "development" or "test".
     dev_login_enabled: bool = Field(default=False)
+
+    # Email notifications (Week 4). "console" writes emails to the server log instead of sending
+    # them, which is the safe default on a laptop. "smtp" sends through the SMTP server below.
+    email_backend: Literal["console", "smtp"] = Field(default="console")
+    smtp_host: str = Field(default="")
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = Field(default="")
+    smtp_password: str = Field(default="")
+    smtp_starttls: bool = Field(default=True)
+    # Sender address. Use an address you control; the app never invents institute addresses.
+    email_from: str = Field(default="facility-booking@localhost")
+    # How many times one email is tried before it stays FAILED (retry with python -m app.db.retry_emails).
+    email_max_attempts: int = Field(default=3, ge=1, le=10)
 
     @property
     def cors_origins(self) -> list[str]:
