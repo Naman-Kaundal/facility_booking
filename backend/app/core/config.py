@@ -1,12 +1,14 @@
 """Application configuration loaded from environment variables (and an optional .env file)."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 INSECURE_DEFAULT_SECRET = "dev-insecure-secret-change-me"
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -60,9 +62,19 @@ class Settings(BaseSettings):
     # How many times one email is tried before it stays FAILED (retry with python -m app.db.retry_emails).
     email_max_attempts: int = Field(default=3, ge=1, le=10)
 
+    # Govt./PSU proof documents (final release). A relative path is inside the backend folder.
+    # The folder is created automatically and is listed in .gitignore.
+    upload_dir: str = Field(default="uploads")
+    max_upload_mb: int = Field(default=5, ge=1, le=20)
+
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.frontend_url.split(",") if origin.strip()]
+
+    @property
+    def upload_path(self) -> Path:
+        path = Path(self.upload_dir)
+        return path if path.is_absolute() else BACKEND_DIR / path
 
     @property
     def frontend_base_url(self) -> str:

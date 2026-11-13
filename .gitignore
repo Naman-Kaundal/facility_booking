@@ -2,6 +2,10 @@
 .env
 *.env.local
 
+# Uploaded Govt./PSU proof documents (personal data: never commit)
+backend/uploads/
+uploads/
+
 # Python
 __pycache__/
 *.pyc
