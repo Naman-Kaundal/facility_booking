@@ -27,7 +27,7 @@ from app.services.auth_service import create_session, sign_in_user
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TABLES = (
-    "email_logs, admin_audit_events, request_costs, app_settings, "
+    "request_documents, email_logs, admin_audit_events, request_costs, app_settings, "
     "reservations, status_events, reference_counters, staff_roles, request_lines, requests, sessions, users, "
     "slot_windows, tariffs, facility_slot_types, facilities"
 )
@@ -91,8 +91,9 @@ def seeded_db(db):
 
 
 @pytest.fixture
-def settings(test_database_url) -> Settings:
+def settings(test_database_url, tmp_path) -> Settings:
     return Settings(
+        upload_dir=str(tmp_path / "uploads"),  # each test gets its own, deleted afterwards
         app_env="test",
         database_url=test_database_url,
         app_secret_key="test-secret",

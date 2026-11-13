@@ -245,6 +245,8 @@ class BookingRequest(TimestampMixin, Base):
 
     # Week 4: the cost breakdown, once Estate has entered the electricity estimate.
     cost: Mapped["RequestCost | None"] = relationship(lazy="selectin", cascade="all, delete-orphan")
+    # Final release: the Govt./PSU proof document (requests at that rate need one to be submitted).
+    document: Mapped["RequestDocument | None"] = relationship(lazy="selectin", cascade="all, delete-orphan")
 
     lines: Mapped[list["RequestLine"]] = relationship(
         back_populates="request",
@@ -541,3 +543,39 @@ class AdminAuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("ix_admin_audit_events_created", "created_at"),)
+
+
+# ---------------------------------------------------------------------------------------------
+# Final release: Govt./PSU proof documents
+# ---------------------------------------------------------------------------------------------
+
+
+class RequestDocument(Base):
+    """The proof document attached to a request booked at the Govt./PSU rate.
+
+    One per request: uploading again replaces it. The file itself is on disk (see
+    ``document_storage``); this row holds its details. Facilities checks it when reviewing the
+    request and returns the request for correction if the proof isn't acceptable.
+    """
+
+    __tablename__ = "request_documents"
+
+    request_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    original_filename: Mapped[str] = mapped_column(String(255))
+    stored_name: Mapped[str] = mapped_column(String(64))
+    content_type: Mapped[str] = mapped_column(String(50))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    uploaded_by: Mapped[int | None] = mapped_column(Integer)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["request_id"], ["requests.id"], name="fk_request_documents_request_id", ondelete="CASCADE"
+        ),
+        ForeignKeyConstraint(
+            ["uploaded_by"], ["users.id"], name="fk_request_documents_uploaded_by", ondelete="SET NULL"
+        ),
+        UniqueConstraint("stored_name", name="uq_request_documents_stored_name"),
+        CheckConstraint("size_bytes > 0", name="ck_request_documents_size_positive"),
+    )
