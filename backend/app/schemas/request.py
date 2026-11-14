@@ -132,6 +132,15 @@ class ChargesPreviewOut(BaseModel):
     note: str
 
 
+class RequestDocumentOut(BaseModel):
+    """Details of a request's Govt./PSU proof document (the file itself is fetched separately)."""
+
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_at: datetime
+
+
 class RequestOut(BaseModel):
     id: int
     ref_no: str | None
@@ -150,6 +159,10 @@ class RequestOut(BaseModel):
     returned_at: datetime | None = None
     # Week 4: staff see it once costed; the requester sees it after the advance intimation.
     costs: CostBreakdownOut | None = None
+    # Final release: requests at the Govt./PSU rate need a proof document. Only the requester and
+    # Facilities see ``document``.
+    needs_document: bool = False
+    document: RequestDocumentOut | None = None
 
 
 class RequestSummaryOut(BaseModel):

@@ -25,6 +25,7 @@ from app.schemas.request import (
     LineIn,
     LinePatch,
     RatePreviewOut,
+    RequestDocumentOut,
     RequestLineOut,
     RequestOut,
     RequestSummaryOut,
@@ -88,10 +89,13 @@ class RequestService:
         self.db.commit()
         return self._reload(user, request.id)
 
-    def delete(self, user: User, request_id: int) -> None:
+    def delete(self, user: User, request_id: int) -> str | None:
+        """Delete a draft. Returns the stored name of its proof document file, for the caller to remove."""
         request = self._editable(user, request_id)
+        stored_name = request.document.stored_name if request.document is not None else None
         self.requests.delete(request)
         self.db.commit()
+        return stored_name
 
     # ----- lines -----
 
@@ -189,7 +193,11 @@ class RequestService:
     def _detail(self, user: User, request: BookingRequest) -> RequestOut:
         # The requester sees the cost breakdown once Facilities has sent the advance intimation.
         return build_request_out(
-            self.facilities, request, user.rate_category, include_costs=request.status == "ADVANCE_INTIMATED"
+            self.facilities,
+            request,
+            user.rate_category,
+            include_costs=request.status == "ADVANCE_INTIMATED",
+            include_document=True,
         )
 
     @staticmethod
@@ -202,6 +210,7 @@ def build_request_out(
     request: BookingRequest,
     live_category: str | None,
     include_costs: bool = False,
+    include_document: bool = False,
 ) -> RequestOut:
     """Request detail for the requester or staff.
 
@@ -256,6 +265,7 @@ def build_request_out(
             )
         )
     costs = costing_service.cost_out(request) if include_costs else None
+    doc = request.document if include_document else None
     final = costs is not None and costs.is_final
     return RequestOut(
         id=request.id,
@@ -287,6 +297,17 @@ def build_request_out(
         return_reason=request.return_reason,
         returned_at=request.returned_at,
         costs=costs,
+        needs_document=category == "GOVT",
+        document=(
+            RequestDocumentOut(
+                original_filename=doc.original_filename,
+                content_type=doc.content_type,
+                size_bytes=doc.size_bytes,
+                uploaded_at=doc.uploaded_at,
+            )
+            if doc is not None
+            else None
+        ),
     )
 
 
